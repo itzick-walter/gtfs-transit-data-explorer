@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTFS Transit Data Explorer</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================================
+           Color Tokens — Light Mode (dark mode tokens added later)
+           ============================================================ */
+        :root {
+            /* Layout backgrounds */
+            --app-bg:            #F7F8FA;
+            --top-bar-bg:        #FFFFFF;
+            --top-bar-border:    #E5E7EB;
+            --left-dock-bg:      #E8EAEE;
+            --left-dock-border:  #E5E7EB;
+
+            /* Accent & text */
+            --primary:           #2563EB;
+            --primary-hover:     #1D4ED8;
+            --primary-light:     #DBEAFE;
+            --primary-text:      #111827;
+            --secondary-text:    #6B7280;
+            --hover-bg:          #E5E7EB;
+
+            /* Semantic status */
+            --success:           #10B981;
+            --success-hover:     #059669;
+            --danger:            #EF4444;
+            --danger-hover:      #DC2626;
+
+            /* Gray scale (kept for internal use) */
+            --gray-50:  #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+
+            /* Shadows & radii */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow:    0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+            --radius-sm: 0.375rem;
+            --radius:    0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+        }
+
+        /* ============================================================
+           Reset & Body
+           ============================================================ */
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--app-bg);
+            color: var(--primary-text);
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           Top App Bar
+           ============================================================ */
+        #topBar {
+            height: 48px;
+            min-height: 48px;
+            background: var(--top-bar-bg);
+            border-bottom: 1px solid var(--top-bar-border);
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            gap: 1rem;
+            z-index: 200;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Brand */
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+        .brand-icon { font-size: 1.375rem; }
+        .brand-text h1 {
+            font-size: 0.9375rem;
+            font-weight: 700;
+            color: var(--primary-text);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .brand-text .subtitle {
+            font-size: 0.6875rem;
+            color: var(--secondary-text);
+            font-weight: 500;
+            line-height: 1.3;
+        }
+
+        /* Search (disabled placeholder) */
+        .search-wrap {
+            flex: 1;
+            max-width: 360px;
+            margin-left: auto;
+        }
+        .search-input {
+            width: 100%;
+            padding: 0.4rem 0.75rem 0.4rem 2rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            color: var(--secondary-text);
+            background: var(--app-bg) url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='6' cy='6' r='4.5' stroke='%239CA3AF' stroke-width='1.5'/%3E%3Cline x1='9.5' y1='9.5' x2='13' y2='13' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 0.6rem center;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .search-input:focus { outline: none; }
+
+        /* Right actions */
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+        .top-bar-icon-btn {
+            width: 2rem;
+            height: 2rem;
+            border-radius: var(--radius);
+            border: none;
+            background: transparent;
+            color: var(--secondary-text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.125rem;
+            transition: background 0.15s, color 0.15s;
+            position: relative;
+        }
+        .top-bar-icon-btn:hover {
+            background: var(--hover-bg);
+            color: var(--primary-text);
+        }
+
+        /* Burger menu */
+        .burger-menu-wrap { position: relative; }
+        .burger-menu-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            min-width: 220px;
+            z-index: 300;
+            overflow: hidden;
+        }
+        .burger-menu-dropdown.open { display: block; }
+        .burger-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.625rem 1rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--primary-text);
+            cursor: pointer;
+            transition: background 0.1s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+        }
+        .burger-menu-item:hover:not(:disabled) { background: var(--hover-bg); }
+        .burger-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
+        .burger-menu-item .menu-icon { font-size: 0.9375rem; color: var(--secondary-text); width: 1.125rem; text-align: center; }
+        .burger-menu-separator { height: 1px; background: var(--gray-200); margin: 0.25rem 0; }
+
+        /* Project name display */
+        .project-name-display {
+            font-size: 0.6875rem;
+            font-weight: 500;
+            color: var(--secondary-text);
+            margin-left: 0.5rem;
+            padding-left: 0.5rem;
+            border-left: 1px solid var(--gray-300);
+        }
+
+        /* State indicators on burger button */
+        .burger-indicator {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 2px solid var(--top-bar-bg);
+        }
+        .burger-indicator.dirty {
+            background: var(--primary);
+        }
+        .burger-indicator.warning {
+            background: #F59E0B;
+        }
+
+        /* ============================================================
+           Shell Layout — dock + map row
+           ============================================================ */
+        .shell {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ============================================================
+           Left Control Dock
+           ============================================================ */
+        #leftDock {
+            width: 300px;
+            min-width: 300px;
+            background: var(--left-dock-bg);
+            border-right: 1px solid var(--left-dock-border);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: left 0.2s ease;
+            position: relative;
+        }
+        #leftDock.collapsed {
+            position: fixed;
+            left: -300px;
+            top: 60px; /* below top bar */
+            bottom: 0;
+            width: 300px;
+        }
+
+        /* Dock Tab Nav */
+        .dock-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--left-dock-border);
+            padding: 0 0.25rem;
+            gap: 0.125rem;
+        }
+        .dock-tab {
+            flex: 1;
+            padding: 0.625rem 0.25rem;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-family: inherit;
+            transition: color 0.15s, border-color 0.15s;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .dock-tab:hover { color: var(--primary-text); }
+        .dock-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: var(--primary-light);
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        }
+
+        /* Dock Tab Content */
+        .dock-panel {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 0.875rem;
+        }
+        .dock-panel.active { display: flex; flex-direction: column; }
+
+        /* Dock section headers */
+        .dock-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.625rem;
+        }
+        .dock-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--secondary-text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .dock-section-add {
+            padding: 0.25rem 0.625rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: var(--primary-light);
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .dock-section-add:hover { background: #BFDBFE; }
+
+        /* Feed / Polygon list items in dock */
+        .dock-list { list-style: none; display: flex; flex-direction: column; gap: 0.375rem; }
+        .dock-list-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.625rem;
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            transition: border-color 0.15s;
+        }
+        .dock-list-item:hover { border-color: var(--gray-300); }
+        .dock-list-item-info { flex: 1; min-width: 0; }
+        .dock-list-item-name {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--primary-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dock-list-item-detail {
+            font-size: 0.6875rem;
+            color: var(--secondary-text);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .dock-list-item-delete {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--gray-400);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            transition: background 0.15s, color 0.15s;
+            flex-shrink: 0;
+            padding: 0;
+        }
+        .dock-list-item-delete:hover { background: #FEE2E2; color: var(--danger); }
+        .dock-list-item-action {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: background 0.15s, color 0.15s;
+            flex-shrink: 0;
+            padding: 0;
+        }
+        .dock-list-item-action:hover { background: var(--gray-100); color: var(--primary-text); }
+
+        /* Missing data styles */
+        .missing-data-banner {
+            padding: 0.625rem 0.75rem;
+            background: #FEF3C7;
+            border: 1px solid #F59E0B;
+            border-radius: var(--radius);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: #92400E;
+        }
+        .missing-data-banner-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .dock-list-item.missing {
+            border-color: #FCA5A5;
+            background: #FEF2F2;
+        }
+        .dock-list-item.missing .dock-list-item-name {
+            color: #991B1B;
+        }
+        .missing-pill {
+            display: inline-block;
+            padding: 0.125rem 0.375rem;
+            background: #FCA5A5;
+            color: #991B1B;
+            font-size: 0.625rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: var(--radius-sm);
+            margin-left: 0.375rem;
+        }
+
+        .dock-empty {
+            text-align: center;
+            padding: 1.5rem 0.5rem;
+            color: var(--gray-400);
+            font-size: 0.8125rem;
+        }
+        .dock-empty-icon { font-size: 1.5rem; margin-bottom: 0.375rem; opacity: 0.5; }
+
+        /* Reset DB button — plain secondary, destructive intent via dialog */
+        .btn-reset-db {
+            display: block;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.4rem 0.75rem;
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-300);
+            color: var(--secondary-text);
+            font-size: 0.6875rem;
+            font-weight: 600;
+            font-family: inherit;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+            text-align: center;
+        }
+        .btn-reset-db:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* Dock section spacing */
+        .dock-section { margin-bottom: 1.25rem; }
+        .dock-section:last-child { margin-bottom: 0; }
+
+        /* ============================================================
+           Filters Tab — controls
+           ============================================================ */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            margin-bottom: 0.75rem;
+        }
+        .control-label {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .help-icon { color: var(--gray-400); cursor: help; font-size: 0.6875rem; }
+
+        select {
+            padding: 0.45rem 2rem 0.45rem 0.625rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            background: var(--top-bar-bg) url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 0.5rem center;
+            appearance: none;
+            color: var(--primary-text);
+            cursor: pointer;
+            transition: border-color 0.15s;
+            width: 100%;
+        }
+        select:hover { border-color: var(--gray-400); }
+        select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+        /* Calendar trigger inside filters */
+        .cal-trigger-wrap { position: relative; display: block; }
+        .cal-trigger {
+            width: 100%;
+            padding: 0.45rem 0.625rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            background: var(--top-bar-bg);
+            color: var(--primary-text);
+            cursor: pointer;
+            transition: border-color 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .cal-trigger:hover { border-color: var(--gray-400); }
+        .cal-trigger:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+        .cal-trigger .cal-icon { font-size: 0.875rem; }
+
+        /* Calendar popup */
+        .cal-popup {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 500;
+            padding: 0.625rem;
+        }
+        .cal-popup.show { display: block; }
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+        .cal-header button {
+            background: none; border: none; font-size: 1rem;
+            color: var(--secondary-text); cursor: pointer;
+            padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);
+            font-family: inherit;
+        }
+        .cal-header button:hover { background: var(--hover-bg); }
+        .cal-header span { font-size: 0.8125rem; font-weight: 700; color: var(--primary-text); }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-grid .cal-dow { font-size: 0.6rem; font-weight: 600; color: var(--gray-400); text-align: center; padding: 0.2rem 0; }
+        .cal-grid .cal-day {
+            font-size: 0.75rem; text-align: center; padding: 0.3rem 0;
+            border-radius: var(--radius-sm); cursor: pointer;
+            color: var(--gray-700); background: transparent; border: none;
+            font-family: inherit; transition: background 0.1s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .cal-grid .cal-day:hover { background: var(--hover-bg); }
+        .cal-grid .cal-day.other-month { color: var(--gray-300); }
+        .cal-grid .cal-day.today { border: 2px solid var(--danger); font-weight: 700; color: var(--danger); }
+        .cal-grid .cal-day.selected { background: var(--primary); color: white; font-weight: 600; }
+        .cal-grid .cal-day.selected.today { border-color: var(--danger); }
+
+        /* Toggle bars (route / polygon / agency / stop filter) */
+        .toggle-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            flex-wrap: wrap;
+        }
+        .toggle-bar-master {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex-shrink: 0;
+        }
+        .toggle-bar-master label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--primary-text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .toggle-bar-master input[type="checkbox"] {
+            accent-color: var(--primary);
+            width: 13px;
+            height: 13px;
+            cursor: pointer;
+        }
+        .toggle-bar-sep { color: var(--gray-300); font-size: 0.6875rem; margin: 0 0.125rem; }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--primary-text);
+            transition: border-color 0.15s;
+            white-space: nowrap;
+        }
+        .toggle-item:hover { border-color: var(--gray-300); }
+        .toggle-item input[type="checkbox"] {
+            accent-color: var(--primary);
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+        }
+        .color-swatch {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .toggle-name {
+            max-width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ============================================================
+           Active Filters Summary
+           ============================================================ */
+        .active-filters-summary {
+            background: var(--primary-light);
+            border: 1px solid #BFDBFE;
+            border-radius: var(--radius);
+            padding: 0.55rem 0.625rem;
+            margin-bottom: 0.75rem;
+            display: none; /* hidden when empty */
+        }
+        .active-filters-summary.visible { display: block; }
+        .active-filters-summary-title {
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.35rem;
+        }
+        .active-filters-summary-row {
+            display: flex;
+            align-items: baseline;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            line-height: 1.6;
+        }
+        .active-filters-summary-key {
+            color: var(--primary);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .active-filters-summary-val {
+            color: var(--gray-700);
+            font-weight: 500;
+        }
+
+        /* ============================================================
+           Filters Tab — section separators
+           ============================================================ */
+        .filter-section {
+            padding-bottom: 0.75rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid var(--left-dock-border);
+        }
+        .filter-section:last-of-type {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .filter-section-title {
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: var(--secondary-text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.45rem;
+        }
+
+        /* Stop filter inner grouping cards */
+        .stop-filter-group {
+            background: var(--top-bar-bg);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            padding: 0.45rem 0.5rem;
+            margin-bottom: 0.375rem;
+        }
+        .stop-filter-group:last-child { margin-bottom: 0; }
+        .stop-filter-group .toggle-bar { gap: 0.3rem; }
+
+        /* Filters tab bottom — Apply / Clear pinned */
+        .filters-actions {
+            margin-top: auto;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--left-dock-border);
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-clear {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            background: var(--top-bar-bg);
+            color: var(--secondary-text);
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .btn-clear:hover { border-color: var(--gray-400); color: var(--primary-text); }
+
+        /* ============================================================
+           Collapse Toggle Strip
+           ============================================================ */
+        #collapseStrip {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 18px;
+            right: -18px; /* hangs off right edge of dock */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 101;
+            transition: right 0.15s ease;
+        }
+        #leftDock.collapsed #collapseStrip {
+            position: fixed;
+            left: 0;
+            top: 50vh;
+            transform: translateY(-50%);
+            z-index: 150; /* above everything */
+        }
+        .collapse-strip-inner {
+            width: 14px;
+            height: 48px;
+            background: var(--left-dock-bg);
+            border: 1px solid var(--left-dock-border);
+            border-left: none;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+            box-shadow: 1px 0 4px rgba(0,0,0,0.06);
+        }
+        #collapseStrip:hover .collapse-strip-inner { background: var(--hover-bg); }
+        .collapse-chevron {
+            font-size: 0.625rem;
+            color: var(--secondary-text);
+            transition: transform 0.15s;
+            /* default: pointing left (dock is expanded, click collapses) */
+        }
+        #leftDock.collapsed .collapse-chevron {
+            transform: scaleX(-1); /* flip to point right when collapsed */
+        }
+
+        /* ============================================================
+           Map
+           ============================================================ */
+        #map { flex: 1; position: relative; z-index: 0; }
+
+        /* ============================================================
+           Import Modals (reuse existing form styles)
+           ============================================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(3px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: var(--top-bar-bg);
+            border-radius: var(--radius-xl);
+            width: 460px;
+            max-width: 92vw;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .modal-close {
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: var(--radius);
+            background: transparent;
+            border: none;
+            color: var(--gray-400);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            padding: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+        .modal-close:hover { background: var(--hover-bg); color: var(--primary-text); }
+        .modal-body { padding: 1.25rem 1.5rem 1.5rem; }
+
+        /* Form groups inside modals */
+        .form-group { margin-bottom: 0.875rem; }
+        .form-group:last-of-type { margin-bottom: 0; }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--primary-text);
+        }
+        .form-group input[type="text"],
+        .form-group input[type="url"] {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            color: var(--primary-text);
+            background: var(--top-bar-bg);
+            transition: border-color 0.15s;
+        }
+        .form-group input[type="text"]:focus,
+        .form-group input[type="url"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            color: var(--primary-text);
+        }
+        .form-group input[type="file"]:hover { border-color: var(--primary); background: var(--primary-light); }
+
+        .btn-modal-submit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.55rem 0.75rem;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+            box-shadow: var(--shadow-sm);
+        }
+        .btn-modal-submit:hover { background: var(--success-hover); }
+
+        /* Import modal tabs */
+        .modal-tabs {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.75rem 1.5rem 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .modal-tab {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: color 0.15s, border-color 0.15s;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .modal-tab:hover { color: var(--primary-text); }
+        .modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .modal-tab-content { display: none; }
+        .modal-tab-content.active { display: block; }
+        .modal-section-label {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.625rem;
+            margin-top: 1rem;
+        }
+        .modal-section-label:first-child { margin-top: 0; }
+
+        /* ============================================================
+           About Modal
+           ============================================================ */
+        .about-modal-body {
+            text-align: center;
+            padding: 2rem 1.5rem;
+        }
+        .about-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .about-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--primary-text);
+            margin-bottom: 0.25rem;
+        }
+        .about-subtitle {
+            font-size: 0.8125rem;
+            color: var(--secondary-text);
+            margin-bottom: 0.75rem;
+        }
+        .about-version {
+            display: inline-block;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            background: var(--gray-200);
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+        }
+
+        /* ============================================================
+           Confirm Dialog Modal (tokenized)
+           ============================================================ */
+        .confirm-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 2000;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 15vh;
+        }
+        .confirm-modal-box {
+            background: var(--top-bar-bg);
+            border-radius: var(--radius-lg);
+            width: 420px;
+            max-width: 90vw;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+        }
+        .confirm-modal-header { padding: 18px 22px 0; }
+        .confirm-modal-title { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--primary-text); }
+        .confirm-modal-body { padding: 12px 22px 18px; font-size: 0.9rem; color: var(--gray-700); line-height: 1.5; }
+        .confirm-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 14px 22px 18px;
+            border-top: 1px solid var(--gray-200);
+        }
+        .confirm-btn-cancel {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+            padding: 7px 18px;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .confirm-btn-cancel:hover { background: var(--hover-bg); }
+        .confirm-btn-action {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .confirm-btn-action:hover { background: var(--danger-hover); }
+
+        /* Prompt dialog (for project name input) */
+        .prompt-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 2000;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 15vh;
+        }
+        .prompt-modal-box {
+            background: var(--top-bar-bg);
+            border-radius: var(--radius-lg);
+            width: 420px;
+            max-width: 90vw;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+        }
+        .prompt-modal-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-family: inherit;
+            margin-top: 0.5rem;
+        }
+        .prompt-modal-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        .prompt-btn-confirm {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .prompt-btn-confirm:hover { background: var(--primary-hover); }
+
+        /* ============================================================
+           Route Detail Panel — map overlay bottom-left (offset for dock)
+           ============================================================ */
+        #routeDetailPanel {
+            display: none;
+            position: fixed;
+            bottom: 1.5rem;
+            left: 318px; /* 300px dock + 18px strip */
+            width: 300px;
+            max-width: calc(100vw - 338px);
+            background: var(--top-bar-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            z-index: 500;
+            overflow: hidden;
+            transition: left 0.15s ease;
+        }
+        #leftDock.collapsed ~ #map ~ #routeDetailPanel,
+        #leftDock.collapsed ~ #routeDetailPanel {
+            left: 1.5rem;
+            max-width: calc(100vw - 3rem);
+        }
+        .detail-panel-header {
+            padding: 0.875rem 1rem 0.625rem;
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .detail-panel-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.4rem;
+        }
+        .detail-name-block {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            flex: 1;
+            padding-right: 0.5rem;
+        }
+        .detail-route-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.6rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.9375rem;
+            font-weight: 700;
+            min-width: 1.75rem;
+            text-align: center;
+        }
+        .detail-long-name { font-size: 0.75rem; color: var(--secondary-text); font-weight: 500; }
+        .detail-type-badge {
+            display: inline-block;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--secondary-text);
+            background: var(--gray-200);
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+        }
+        .detail-close-btn {
+            width: 1.75rem; height: 1.75rem;
+            border-radius: var(--radius-sm);
+            background: transparent; border: none;
+            color: var(--gray-400); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; padding: 0;
+            transition: background 0.15s, color 0.15s; flex-shrink: 0;
+        }
+        .detail-close-btn:hover { background: var(--gray-200); color: var(--primary-text); }
+        .detail-panel-body { padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.375rem; }
+        .detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; font-size: 0.75rem; }
+        .detail-row-full { flex-direction: column; gap: 0.15rem; }
+        .detail-label { color: var(--secondary-text); font-weight: 600; flex-shrink: 0; min-width: 80px; }
+        .detail-value { color: var(--gray-800); text-align: right; display: flex; align-items: center; gap: 0.3rem; }
+        .detail-row-full .detail-value { text-align: left; font-style: italic; color: var(--secondary-text); }
+        .detail-value code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6875rem;
+            background: var(--gray-100);
+            padding: 0.1rem 0.35rem;
+            border-radius: var(--radius-sm);
+            color: var(--gray-700);
+        }
+
+        /* ============================================================
+           Loading Overlay
+           ============================================================ */
+        .loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
+            z-index: 9999; align-items: center; justify-content: center;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-card {
+            background: var(--top-bar-bg);
+            padding: 2rem; border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl); text-align: center; min-width: 260px;
+        }
+        .spinner {
+            width: 2.5rem; height: 2.5rem;
+            border: 3px solid var(--gray-200);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 0.75rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 0.8125rem; font-weight: 600; color: var(--secondary-text); }
+
+        /* ============================================================
+           Toast
+           ============================================================ */
+        .toast {
+            position: fixed; top: 1rem; right: 1rem;
+            background: var(--top-bar-bg);
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            display: flex; align-items: center; gap: 0.625rem;
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left: 3px solid var(--success); }
+        .toast.error { border-left: 3px solid var(--danger); }
+        .toast-icon { font-size: 1.25rem; }
+        .toast-message { font-size: 0.8125rem; font-weight: 500; color: var(--primary-text); }
+
+        /* ============================================================
+           Leaflet icon overrides
+           ============================================================ */
+        .custom-stop-icon { background: none !important; border: none !important; }
+        .leaflet-div-icon { background: transparent; border: none; }
+
+        /* ============================================================
+           Scrollbar
+           ============================================================ */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+        /* ============================================================
+           Version Label (dock footer)
+           ============================================================ */
+        .dock-version {
+            padding: 0.5rem 0.875rem;
+            border-top: 1px solid var(--left-dock-border);
+            font-size: 0.625rem;
+            font-weight: 600;
+            color: var(--gray-500);
+            letter-spacing: 0.04em;
+            text-align: right;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================================
+     Top App Bar
+     ============================================================ -->
+<div id="topBar">
+    <div class="brand">
+        <span class="brand-icon">🚌</span>
+        <div class="brand-text">
+            <h1>GTFS Transit Data Explorer</h1>
+        </div>
+        <span class="project-name-display" id="projectNameDisplay" style="display:none;"></span>
+    </div>
+
+    <div class="search-wrap">
+        <input class="search-input" type="text" placeholder="Search stops, routes…" disabled>
+    </div>
+
+    <div class="top-bar-actions">
+        <!-- Burger menu -->
+        <div class="burger-menu-wrap">
+            <button class="top-bar-icon-btn" id="burgerMenuTrigger" title="Menu" aria-label="Menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+                <span id="burgerIndicator" class="burger-indicator" style="display:none;"></span>
+            </button>
+            <div class="burger-menu-dropdown" id="burgerMenuDropdown">
+                <button class="burger-menu-item" id="menuNewProject">
+                    <span class="menu-icon">📄</span> New Project
+                </button>
+                <div class="burger-menu-separator"></div>
+                <button class="burger-menu-item" id="menuSaveProject">
+                    <span class="menu-icon">💾</span> Save Project
+                </button>
+                <button class="burger-menu-item" id="menuSaveAs">
+                    <span class="menu-icon">📁</span> Save Project As
+                </button>
+                <button class="burger-menu-item" id="menuLoadProject">
+                    <span class="menu-icon">📂</span> Load Project
+                </button>
+                <div class="burger-menu-separator"></div>
+                <button class="burger-menu-item" id="menuToggleTheme">
+                    <span class="menu-icon">🌓</span> <span id="themeToggleText">Dark Mode</span>
+                </button>
+                <button class="burger-menu-item" id="menuAbout">
+                    <span class="menu-icon">ℹ️</span> About
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Shell — Dock + Map
+     ============================================================ -->
+<div class="shell">
+
+    <!-- Left Control Dock -->
+    <div id="leftDock">
+        <!-- Collapse Strip -->
+        <div id="collapseStrip" title="Toggle panel" role="button" tabindex="0">
+            <div class="collapse-strip-inner">
+                <span class="collapse-chevron">◀</span>
+            </div>
+        </div>
+
+        <!-- Tab Nav -->
+        <div class="dock-tabs">
+            <button class="dock-tab active" data-tab="data"  id="tabData">Data</button>
+            <button class="dock-tab" data-tab="layers"  id="tabLayers">Layers</button>
+            <button class="dock-tab" data-tab="filters"  id="tabFilters">Filters</button>
+        </div>
+
+        <!-- ---- DATA TAB ---- -->
+        <div class="dock-panel active" id="dock-data">
+            <!-- Feeds Section -->
+            <div class="dock-section">
+                <div class="dock-section-header">
+                    <span class="dock-section-title">Feeds</span>
+                    <button class="dock-section-add" id="btnImportFeed">+ Import GTFS Feed</button>
+                </div>
+                <ul class="dock-list" id="feedList"></ul>
+                <div class="dock-empty" id="emptyFeeds" style="display:none;">
+                    <div class="dock-empty-icon">📭</div>
+                    No feeds imported yet
+                </div>
+            </div>
+            <!-- Polygons Section -->
+            <div class="dock-section">
+                <div class="dock-section-header">
+                    <span class="dock-section-title">Polygons</span>
+                    <button class="dock-section-add" id="btnAddPolygon">+ Add Polygon</button>
+                </div>
+                <ul class="dock-list" id="polygonList"></ul>
+                <div class="dock-empty" id="emptyPolygons" style="display:none;">
+                    <div class="dock-empty-icon">📭</div>
+                    No polygons imported yet
+                </div>
+            </div>
+            <!-- Reset DB (shown only when feeds exist) -->
+            <div id="resetDbSection" style="display:none;">
+                <button class="btn-reset-db" id="btnResetDb">Remove All Data</button>
+            </div>
+        </div>
+
+        <!-- ---- FILTERS TAB ---- -->
+        <div class="dock-panel" id="dock-filters">
+            <!-- Active Filters Summary (read-only, updates on Apply) -->
+            <div class="active-filters-summary" id="activeSummary"></div>
+
+            <!-- 1. Feed -->
+            <div class="filter-section">
+                <div class="filter-section-title">Feed</div>
+                <select id="feedFilter"><option value="">All Feeds</option></select>
+            </div>
+
+            <!-- 2. Agencies (hidden when <2 agencies) -->
+            <div class="filter-section" id="agencyFilterGroup" style="display:none;">
+                <div class="filter-section-title">Agencies</div>
+                <div id="agencyTogglePanel" class="toggle-bar">
+                    <div class="toggle-bar-master">
+                        <label><input type="checkbox" id="agencyMasterCheckbox" checked> All</label>
+                    </div>
+                    <span class="toggle-bar-sep">|</span>
+                    <div id="agencyToggleList" style="display:flex; gap:0.375rem; flex-wrap:wrap;"></div>
+                </div>
+            </div>
+
+            <!-- 3. Stops (populated dynamically after Apply) -->
+            <div class="filter-section" id="stopFilterPanel" style="display:none;">
+                <div class="filter-section-title">Stops</div>
+                <div class="stop-filter-group" id="stopFilterGroupBooleans"></div>
+                <div class="stop-filter-group" id="stopFilterGroupTypes"></div>
+            </div>
+
+            <!-- 4. Service Day -->
+            <div class="filter-section">
+                <div class="filter-section-title">Service Day</div>
+                <select id="dayTypeSelect">
+                    <option value="all">All Days</option>
+                    <option value="weekday">Weekday</option>
+                    <option value="saturday">Saturday</option>
+                    <option value="sunday">Sunday</option>
+                    <option value="specific">Specific Date</option>
+                </select>
+                <div class="cal-trigger-wrap" id="calTriggerWrap" style="display:none; margin-top:0.3rem;">
+                    <button class="cal-trigger" id="calTrigger">
+                        <span class="cal-icon">📅</span>
+                        <span id="calTriggerText">Select date</span>
+                    </button>
+                    <div class="cal-popup" id="calPopup"></div>
+                </div>
+            </div>
+
+            <!-- Clear Filters button -->
+            <div class="filters-actions">
+                <button class="btn-clear" id="btnClearFilters">🗑️ Clear Filters</button>
+            </div>
+        </div>
+
+        <!-- ---- LAYERS TAB ---- -->
+        <div class="dock-panel" id="dock-layers">
+            <!-- Routes -->
+            <div class="dock-section" id="routeLayerSection" style="display:none;">
+                <div class="dock-section-header">
+                    <span class="dock-section-title">Routes</span>
+                </div>
+                <div id="routeShapePanel" class="toggle-bar">
+                    <div class="toggle-bar-master">
+                        <label><input type="checkbox" id="routesMasterCheckbox" checked> All</label>
+                    </div>
+                    <span class="toggle-bar-sep">|</span>
+                    <div id="routeToggleList" style="display:flex; gap:0.375rem; flex-wrap:wrap;"></div>
+                </div>
+            </div>
+            <!-- Polygons -->
+            <div class="dock-section" id="polygonLayerSection" style="display:none;">
+                <div class="dock-section-header">
+                    <span class="dock-section-title">Polygons</span>
+                </div>
+                <div id="polygonTogglePanel" class="toggle-bar">
+                    <div class="toggle-bar-master">
+                        <label><input type="checkbox" id="polygonsMasterCheckbox" checked> All</label>
+                    </div>
+                    <span class="toggle-bar-sep">|</span>
+                    <div id="polygonToggleList" style="display:flex; gap:0.375rem; flex-wrap:wrap;"></div>
+                </div>
+            </div>
+            <!-- Stops visibility -->
+            <div class="dock-section">
+                <div class="dock-section-header">
+                    <span class="dock-section-title">Stops</span>
+                </div>
+                <div class="toggle-bar">
+                    <label class="toggle-item" id="stopsVisibilityToggle">
+                        <input type="checkbox" id="stopsVisibleCheckbox" checked>
+                        <span>Stops</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Version Label -->
+        <div class="dock-version" id="dockVersion">v1.0.1</div>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+</div>
+
+<!-- Route Detail Panel (map overlay) -->
+<div id="routeDetailPanel"></div>
+
+<!-- ============================================================
+     Feed Import Modal
+     ============================================================ -->
+<div class="modal-overlay" id="feedModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">📥 Import GTFS Feed</span>
+            <button class="modal-close" id="btnCloseFeedModal">×</button>
+        </div>
+        <div class="modal-tabs">
+            <button class="modal-tab active" id="feedTabUrl">From URL</button>
+            <button class="modal-tab" id="feedTabFile">From File</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-tab-content active" id="feedTab-url">
+                <div class="form-group">
+                    <label>Feed Name</label>
+                    <input type="text" id="gtfsName" placeholder="e.g., SF Muni">
+                </div>
+                <div class="form-group">
+                    <label>GTFS URL</label>
+                    <input type="url" id="gtfsUrl" placeholder="https://example.com/gtfs.zip">
+                </div>
+                <button class="btn-modal-submit" id="btnSubmitFeedUrl">📥 Import GTFS</button>
+            </div>
+            <div class="modal-tab-content" id="feedTab-file">
+                <div class="form-group">
+                    <label>Feed Name</label>
+                    <input type="text" id="gtfsFileName" placeholder="e.g., LA Metro">
+                </div>
+                <div class="form-group">
+                    <label>GTFS Zip File</label>
+                    <input type="file" id="gtfsFile" accept=".zip">
+                </div>
+                <button class="btn-modal-submit" id="btnSubmitFeedFile">📤 Upload GTFS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Polygon Import Modal
+     ============================================================ -->
+<div class="modal-overlay" id="polygonModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">📍 Import Polygons</span>
+            <button class="modal-close" id="btnClosePolygonModal">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>KML or GeoJSON File</label>
+                <input type="file" id="kmlFile" accept=".kml,.geojson,.json">
+            </div>
+            <button class="btn-modal-submit" id="btnSubmitPolygon">📍 Upload Polygons</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     About Modal
+     ============================================================ -->
+<div class="modal-overlay" id="aboutModal">
+    <div class="modal-box" style="width:360px; max-width:90vw;">
+        <div class="modal-header">
+            <span class="modal-title">About</span>
+            <button class="modal-close" id="btnCloseAboutModal">×</button>
+        </div>
+        <div class="about-modal-body">
+            <div class="about-icon">🚌</div>
+            <div class="about-title">GTFS Transit Data Explorer</div>
+            <div class="about-subtitle">Created by Itzick Walter</div>
+            <div class="about-version" id="aboutVersion">v1.0.1</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Loading Overlay
+     ============================================================ -->
+<div id="loading" class="loading-overlay">
+    <div class="loading-card">
+        <div class="spinner"></div>
+        <div class="loading-text">Processing…</div>
+    </div>
+</div>
+
+<!-- ============================================================
+     Toast
+     ============================================================ -->
+<div id="toast" class="toast">
+    <span class="toast-icon">✓</span>
+    <span class="toast-message"></span>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="projectFileInput" accept=".tde" style="display:none">
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
+
+<style>
+/* Import Progress */
+.import-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 10000;
+    min-width: 400px;
+}
+
+.progress-container h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.2rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2563EB, #3B82F6);
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Missing Data Banner */
+.missing-data-banner {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFF3CD;
+    border: 2px solid #FFC107;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9999;
+    max-width: 600px;
+}
+
+.banner-content h3 {
+    margin: 0 0 0.5rem 0;
+    color: #856404;
+}
+
+.banner-content p {
+    margin: 0.5rem 0;
+    color: #856404;
+}
+
+.banner-content ul {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+
+.banner-content li {
+    margin: 0.25rem 0;
+    color: #856404;
+}
+
+.banner-content button {
+    margin-top: 1rem;
+}
+
+/* Toast Notifications */
+.toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    border-left: 4px solid #10B981;
+}
+
+.toast-error {
+    border-left: 4px solid #EF4444;
+}
+
+.toast-warning {
+    border-left: 4px solid #FFC107;
+}
+
+.toast-info {
+    border-left: 4px solid #2563EB;
+}
+</style>
