@@ -7,7 +7,7 @@
 import { dataManager } from './data-manager.js';
 import { captureProjectState, saveProject, loadProject } from './project-io.js';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 const ROUTE_TYPE_CONFIG = {
     0: { name: 'Tram/Light Rail', color: '#F4C430' },

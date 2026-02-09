@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   // Base path for GitHub Pages deployment
-  // Change this to match your repository name
-  base: '/transit-data-explorer/',
+  // MUST match your GitHub Pages URL: username.github.io/repo-name/
+  base: '/gtfs-transit-data-explorer/',
   
   build: {
     outDir: 'dist',
