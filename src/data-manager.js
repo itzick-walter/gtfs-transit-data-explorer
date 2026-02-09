@@ -112,8 +112,11 @@ class DataManager {
       
       for (const route of feed.routes.values()) {
         // Filter by agency
-        if (agencyIds && agencyIds.length > 0 && !agencyIds.includes(route.agency_id)) {
-          continue;
+        if (agencyIds && agencyIds.length > 0) {
+          // If route has no agency_id, include it (some GTFS feeds omit agency_id)
+          if (route.agency_id && !agencyIds.includes(route.agency_id)) {
+            continue;
+          }
         }
         
         // Filter by route type
